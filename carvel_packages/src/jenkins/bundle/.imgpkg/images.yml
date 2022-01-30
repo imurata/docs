@@ -1,0 +1,10 @@
+---
+apiVersion: imgpkg.carvel.dev/v1alpha1
+images:
+- annotations:
+    kbld.carvel.dev/id: jenkins/jenkins:2.319.1-jdk11
+  image: index.docker.io/jenkins/jenkins@sha256:c1d02293a08ba69483992f541935f7639fb10c6c322785bdabaf7fa94cd5e732
+- annotations:
+    kbld.carvel.dev/id: kiwigrid/k8s-sidecar:1.14.2
+  image: index.docker.io/kiwigrid/k8s-sidecar@sha256:35654389f8a9b7816193a4811cf3ceb6cf309ece8874e84b3d2d8399e618059b
+kind: ImagesLock

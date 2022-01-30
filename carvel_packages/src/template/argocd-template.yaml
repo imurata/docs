@@ -1,0 +1,29 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:yaml", "yaml")
+---
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: Package
+metadata:
+  name: #@ "argo-cd.tkg.tanzu." + data.values.version
+spec:
+  refName: argo-cd.tkg.tanzu
+  version: #@ data.values.version
+  releaseNotes: |
+        Initial release of Argo CD for Air-gapped env
+  valuesSchema:
+    openAPIv3: #@ yaml.decode(data.values.openapi)["components"]["schemas"]["dataValues"]
+  template:
+    spec:
+      fetch:
+      - imgpkgBundle:
+          image: oss-harbor.tkg.tanzu/my-project/argo-cd/bundle@sha256:a282119c51d1f7d1434e988c8f70c8c4fd1ba3ff8816abb7298217a3a4e07b60
+      template:
+      - ytt:
+          paths:
+          - "./config"
+      - kbld:
+          paths:
+          - "-"
+          - ".imgpkg/images.yml"
+      deploy:
+      - kapp: {}

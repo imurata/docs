@@ -1,0 +1,16 @@
+---
+apiVersion: imgpkg.carvel.dev/v1alpha1
+images:
+- annotations:
+    kbld.carvel.dev/id: oss-harbor.tkg.tanzu/my-project/argo-cd/bundle@sha256:a282119c51d1f7d1434e988c8f70c8c4fd1ba3ff8816abb7298217a3a4e07b60
+  image: oss-harbor.tkg.tanzu/my-project/argo-cd/bundle@sha256:a282119c51d1f7d1434e988c8f70c8c4fd1ba3ff8816abb7298217a3a4e07b60
+- annotations:
+    kbld.carvel.dev/id: oss-harbor.tkg.tanzu/my-project/code-server/bundle@sha256:c4317874eecade3b1ae7f725861b1afb38da6aab896c22e080ab5b3a0af6f73a
+  image: oss-harbor.tkg.tanzu/my-project/code-server/bundle@sha256:c4317874eecade3b1ae7f725861b1afb38da6aab896c22e080ab5b3a0af6f73a
+- annotations:
+    kbld.carvel.dev/id: oss-harbor.tkg.tanzu/my-project/gitea/bundle@sha256:adc2405b3ec6511d56446ab71ae707bc1e4cd526e1ec6752fdf84084ca10a484
+  image: oss-harbor.tkg.tanzu/my-project/gitea/bundle@sha256:adc2405b3ec6511d56446ab71ae707bc1e4cd526e1ec6752fdf84084ca10a484
+- annotations:
+    kbld.carvel.dev/id: oss-harbor.tkg.tanzu/my-project/jenkins/bundle@sha256:f27ac987462f89df00bdddf835fc763178e4bb0249c0c2b45e723ec03b9f8bbd
+  image: oss-harbor.tkg.tanzu/my-project/jenkins/bundle@sha256:f27ac987462f89df00bdddf835fc763178e4bb0249c0c2b45e723ec03b9f8bbd
+kind: ImagesLock

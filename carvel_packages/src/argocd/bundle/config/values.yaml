@@ -1,0 +1,8 @@
+#@data/values-schema
+---
+#@schema/desc "Namespace"
+namespace: argo-cd
+#@schema/desc "Hostname"
+argocd_host: example.com
+#@schema/desc "gRPC Hostname"
+argocd_grpc_host: grpc.example.com

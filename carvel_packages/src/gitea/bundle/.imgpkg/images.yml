@@ -1,0 +1,13 @@
+---
+apiVersion: imgpkg.carvel.dev/v1alpha1
+images:
+- annotations:
+    kbld.carvel.dev/id: docker.io/bitnami/memcached:1.6.9-debian-10-r114
+  image: index.docker.io/bitnami/memcached@sha256:6b10107669332f3f68b659f3f13ce33c869d2dcaacdd64fd3e6cf0a7d98b9cd7
+- annotations:
+    kbld.carvel.dev/id: docker.io/bitnami/postgresql:11.11.0-debian-10-r62
+  image: index.docker.io/bitnami/postgresql@sha256:044559541242562493957ab02c3ff7a9a55b8571aa2c8d98e0557b189c2d3968
+- annotations:
+    kbld.carvel.dev/id: gitea/gitea:1.15.10
+  image: index.docker.io/gitea/gitea@sha256:a4f16b2c220247d6b580a2216df4ff0880f05e0194458de082f09575e92de160
+kind: ImagesLock

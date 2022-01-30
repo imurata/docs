@@ -1,0 +1,13 @@
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: PackageMetadata
+metadata:
+  name: argo-cd.tkg.tanzu
+spec:
+  displayName: "Argo CD"
+  longDescription: "Deploy tool for Kubernetes"
+  shortDescription: "GitOps"
+  providerName: IT Dept.
+  maintainers:
+  - name: John Doe
+  categories:
+    - "CICD"

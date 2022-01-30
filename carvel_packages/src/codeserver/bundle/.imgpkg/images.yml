@@ -1,0 +1,10 @@
+---
+apiVersion: imgpkg.carvel.dev/v1alpha1
+images:
+- annotations:
+    kbld.carvel.dev/id: busybox:latest
+  image: index.docker.io/library/busybox@sha256:5acba83a746c7608ed544dc1533b87c737a0b0fb730301639a0179f9344b1678
+- annotations:
+    kbld.carvel.dev/id: codercom/code-server:4.0.2
+  image: index.docker.io/codercom/code-server@sha256:4de6369f5865c7db250fa25e3e2306ed5a3f0bad922c9392d52c0dd1dd7e4fd6
+kind: ImagesLock

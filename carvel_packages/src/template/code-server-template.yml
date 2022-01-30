@@ -1,0 +1,30 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:yaml", "yaml")
+---
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: Package
+metadata:
+  name: #@ "code-server.tkg.tanzu." + data.values.version
+spec:
+  refName: code-server.tkg.tanzu
+  version: #@ data.values.version
+  releaseNotes: |
+        Initial release of code-server for Air-gapped env
+  valuesSchema:
+    openAPIv3: #@ yaml.decode(data.values.openapi)["components"]["schemas"]["dataValues"]
+  template:
+    spec:
+      fetch:
+      - imgpkgBundle:
+          image: oss-harbor.tkg.tanzu/my-project/code-server/bundle@sha256:c4317874eecade3b1ae7f725861b1afb38da6aab896c22e080ab5b3a0af6f73a
+      template:
+      - ytt:
+          paths:
+          - "./config"
+      - kbld:
+          paths:
+          - "-"
+          - ".imgpkg/images.yml"
+      deploy:
+      - kapp: {}
+

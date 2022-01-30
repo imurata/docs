@@ -1,0 +1,13 @@
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: PackageMetadata
+metadata:
+  name: jenkins.tkg.tanzu
+spec:
+  displayName: "jenkins"
+  longDescription: "CI/CD Pipeline"
+  shortDescription: "CI/CD"
+  providerName: IT Dept.
+  maintainers:
+  - name: John Doe
+  categories:
+    - "CICD"

@@ -1,0 +1,10 @@
+apiVersion: packaging.carvel.dev/v1alpha1
+kind: PackageRepository
+metadata:
+  name: dev-repo
+spec:
+  fetch:
+    imgpkgBundle:
+      image: oss-harbor.tkg.tanzu/my-packages/dev-repo:1.0.3
+      secretRef:
+        name: myimagerepo

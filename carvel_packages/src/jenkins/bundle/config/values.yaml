@@ -1,0 +1,8 @@
+#@data/values-schema
+---
+#@schema/desc "Namespace"
+namespace: jenkins
+#@schema/desc "Default Password"
+jenkins_password: "VMware1!"
+#@schema/desc "Hostname"
+jenkins_host: example.com

@@ -1,0 +1,41 @@
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: Package
+metadata:
+  name: argo-cd.tkg.tanzu.2.0.14
+spec:
+  refName: argo-cd.tkg.tanzu
+  version: 2.0.14
+  releaseNotes: |
+    Initial release of Argo CD for Air-gapped env
+  valuesSchema:
+    openAPIv3:
+      type: object
+      additionalProperties: false
+      properties:
+        namespace:
+          type: string
+          default: argo-cd
+          description: Namespace
+        argocd_host:
+          type: string
+          default: example.com
+          description: Hostname
+        argocd_grpc_host:
+          type: string
+          default: grpc.example.com
+          description: gRPC Hostname
+  template:
+    spec:
+      fetch:
+      - imgpkgBundle:
+          image: oss-harbor.tkg.tanzu/my-project/argo-cd/bundle@sha256:a282119c51d1f7d1434e988c8f70c8c4fd1ba3ff8816abb7298217a3a4e07b60
+      template:
+      - ytt:
+          paths:
+          - ./config
+      - kbld:
+          paths:
+          - '-'
+          - .imgpkg/images.yml
+      deploy:
+      - kapp: {}

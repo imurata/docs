@@ -1,0 +1,14 @@
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: PackageMetadata
+metadata:
+  name: code-server.tkg.tanzu
+spec:
+  displayName: "code-server"
+  longDescription: "Code Editor similar to VSCode"
+  shortDescription: "Code Editor"
+  providerName: IT Dept.
+  maintainers:
+  - name: John Doe
+  categories:
+    - "IDE"
+  supportDescription: "The detailed documentation is on https://github.com/coder/code-server/tree/main/docs.  Support is available from the community."

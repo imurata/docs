@@ -1,0 +1,8 @@
+#@data/values-schema
+---
+#@schema/desc "Namespace"
+namespace: code-server-edit
+#@schema/desc "Default Password"
+code_server_password: "VMware1!"
+#@schema/desc "Hostname"
+code_server_host: example.com

@@ -1,0 +1,32 @@
+#@ load("@ytt:overlay", "overlay")
+#@ load("@ytt:data", "data")
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: gitea-selfsigned-issuer
+  namespace: #@ data.values.namespace
+spec:
+  selfSigned: { }
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gitea-ca
+  namespace: #@ data.values.namespace
+spec:
+  commonName: gitea-ca
+  isCA: true
+  issuerRef:
+    kind: Issuer
+    name: gitea-selfsigned-issuer
+  secretName: gitea-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: gitea-ca-issuer
+  namespace: #@ data.values.namespace
+spec:
+  ca:
+    secretName: gitea-ca

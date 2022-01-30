@@ -1,0 +1,13 @@
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: PackageMetadata
+metadata:
+  name: gitea.tkg.tanzu
+spec:
+  displayName: "Gitea"
+  longDescription: "Provide Git repository similar to GitHub"
+  shortDescription: "Gitea"
+  providerName: IT Dept.
+  maintainers:
+  - name: John Doe
+  categories:
+    - "CICD"

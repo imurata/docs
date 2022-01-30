@@ -1,0 +1,10 @@
+---
+apiVersion: imgpkg.carvel.dev/v1alpha1
+images:
+- annotations:
+    kbld.carvel.dev/id: docker.io/bitnami/argo-cd:2.1.7-debian-10-r0
+  image: index.docker.io/bitnami/argo-cd@sha256:106624f4503732358cba6d74ecfe4d469086a8197cff5ffe78cb4ba414ef67a9
+- annotations:
+    kbld.carvel.dev/id: docker.io/bitnami/redis:6.2.6-debian-10-r42
+  image: index.docker.io/bitnami/redis@sha256:c8d387dfd5b466a20914313f3bba424dc938241f4636433bc2bb66bb8afd6049
+kind: ImagesLock

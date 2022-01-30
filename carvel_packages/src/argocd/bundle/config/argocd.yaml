@@ -1,0 +1,1646 @@
+---
+# Source: argo-cd/charts/redis/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: argo-cd-redis
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: argo-cd/templates/application-controller/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-cd-argocd-app-controller
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+automountServiceAccountToken: true
+---
+# Source: argo-cd/templates/repo-server/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-cd-argocd-repo-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: repo-server
+automountServiceAccountToken: true
+---
+# Source: argo-cd/templates/server/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-cd-argocd-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: server
+automountServiceAccountToken: true
+---
+# Source: argo-cd/charts/redis/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-cd-redis
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+data:
+  redis-password: "cGFzc3dvcmQ="
+---
+# Source: argo-cd/templates/argocd-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  # Mandatory hardcoded name.
+  # Ref: https://github.com/argoproj/argo-cd/blob/master/docs/operator-manual/argocd-secret.yaml
+  name: argocd-secret
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    # Mandatory label
+    # Ref: https://argoproj.github.io/argo-cd/operator-manual/declarative-setup/#atomic-configuration
+    app.kubernetes.io/part-of: argocd
+type: Opaque
+data:
+  clearPassword: cGFzc3dvcmQ=
+  # The password needs to be bcrypt hashed
+  admin.password: JDJhJDEwJDA3R3lpQXJ6SGU3Y1dKRlh1bldLNGU4TUxMSHJuMkMvdERRWW1MeEoyYldJcnR4WDQud0FT
+  admin.passwordMtime: MjAyMi0wMS0zMFQwNjowNDozM1o=
+---
+# Source: argo-cd/charts/redis/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argo-cd-redis-configuration
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+data:
+  redis.conf: |-
+    # User-supplied common configuration:
+    # Enable AOF https://redis.io/topics/persistence#append-only-file
+    appendonly yes
+    # Disable RDB persistence, AOF persistence already enabled.
+    save ""
+    # End of common configuration
+  master.conf: |-
+    dir /data
+    # User-supplied master configuration:
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    # End of master configuration
+  replica.conf: |-
+    dir /data
+    slave-read-only yes
+    # User-supplied replica configuration:
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    # End of replica configuration
+---
+# Source: argo-cd/charts/redis/templates/health-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argo-cd-redis-health
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+data:
+  ping_readiness_local.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
+    response=$(
+      timeout -s 3 $1 \
+      redis-cli \
+        -h localhost \
+        -p $REDIS_PORT \
+        ping
+    )
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_liveness_local.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
+    response=$(
+      timeout -s 3 $1 \
+      redis-cli \
+        -h localhost \
+        -p $REDIS_PORT \
+        ping
+    )
+    if [ "$response" != "PONG" ] && [ "$response" != "LOADING Redis is loading the dataset in memory" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_readiness_master.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+    [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
+    response=$(
+      timeout -s 3 $1 \
+      redis-cli \
+        -h $REDIS_MASTER_HOST \
+        -p $REDIS_MASTER_PORT_NUMBER \
+        ping
+    )
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_liveness_master.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+    [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
+    response=$(
+      timeout -s 3 $1 \
+      redis-cli \
+        -h $REDIS_MASTER_HOST \
+        -p $REDIS_MASTER_PORT_NUMBER \
+        ping
+    )
+    if [ "$response" != "PONG" ] && [ "$response" != "LOADING Redis is loading the dataset in memory" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_readiness_local_and_master.sh: |-
+    script_dir="$(dirname "$0")"
+    exit_status=0
+    "$script_dir/ping_readiness_local.sh" $1 || exit_status=$?
+    "$script_dir/ping_readiness_master.sh" $1 || exit_status=$?
+    exit $exit_status
+  ping_liveness_local_and_master.sh: |-
+    script_dir="$(dirname "$0")"
+    exit_status=0
+    "$script_dir/ping_liveness_local.sh" $1 || exit_status=$?
+    "$script_dir/ping_liveness_master.sh" $1 || exit_status=$?
+    exit $exit_status
+---
+# Source: argo-cd/charts/redis/templates/scripts-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argo-cd-redis-scripts
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+data:
+  start-master.sh: |
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    if [[ ! -f /opt/bitnami/redis/etc/master.conf ]];then
+        cp /opt/bitnami/redis/mounted-etc/master.conf /opt/bitnami/redis/etc/master.conf
+    fi
+    if [[ ! -f /opt/bitnami/redis/etc/redis.conf ]];then
+        cp /opt/bitnami/redis/mounted-etc/redis.conf /opt/bitnami/redis/etc/redis.conf
+    fi
+    ARGS=("--port" "${REDIS_PORT}")
+    ARGS+=("--requirepass" "${REDIS_PASSWORD}")
+    ARGS+=("--masterauth" "${REDIS_PASSWORD}")
+    ARGS+=("--include" "/opt/bitnami/redis/etc/redis.conf")
+    ARGS+=("--include" "/opt/bitnami/redis/etc/master.conf")
+    exec redis-server "${ARGS[@]}"
+  start-replica.sh: |
+    #!/bin/bash
+
+    get_port() {
+        hostname="$1"
+        type="$2"
+
+        port_var=$(echo "${hostname^^}_SERVICE_PORT_$type" | sed "s/-/_/g")
+        port=${!port_var}
+        
+        if [ -z "$port" ]; then
+            case $type in
+                "SENTINEL")
+                    echo 26379
+                    ;;
+                "REDIS")
+                    echo 6379
+                    ;;
+            esac
+        else
+            echo $port
+        fi
+    }
+
+    get_full_hostname() {
+        hostname="$1"
+        echo "${hostname}.${HEADLESS_SERVICE}"
+    }
+
+    REDISPORT=$(get_port "$HOSTNAME" "REDIS")
+    
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+    if [[ ! -f /opt/bitnami/redis/etc/replica.conf ]];then
+        cp /opt/bitnami/redis/mounted-etc/replica.conf /opt/bitnami/redis/etc/replica.conf
+    fi
+    if [[ ! -f /opt/bitnami/redis/etc/redis.conf ]];then
+        cp /opt/bitnami/redis/mounted-etc/redis.conf /opt/bitnami/redis/etc/redis.conf
+    fi
+
+    echo "" >> /opt/bitnami/redis/etc/replica.conf
+    echo "replica-announce-port $REDISPORT" >> /opt/bitnami/redis/etc/replica.conf
+    echo "replica-announce-ip $(get_full_hostname "$HOSTNAME")" >> /opt/bitnami/redis/etc/replica.conf
+    ARGS=("--port" "${REDIS_PORT}")
+    ARGS+=("--slaveof" "${REDIS_MASTER_HOST}" "${REDIS_MASTER_PORT_NUMBER}")
+    ARGS+=("--requirepass" "${REDIS_PASSWORD}")
+    ARGS+=("--masterauth" "${REDIS_MASTER_PASSWORD}")
+    ARGS+=("--include" "/opt/bitnami/redis/etc/redis.conf")
+    ARGS+=("--include" "/opt/bitnami/redis/etc/replica.conf")
+    exec redis-server "${ARGS[@]}"
+---
+# Source: argo-cd/templates/argocd-cm.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # Mandatory hardcoded name.
+  # Ref: https://github.com/argoproj/argo-cd/blob/master/docs/operator-manual/argocd-cm.yaml
+  name: argocd-cm
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    # Mandatory label
+    # Ref: https://argoproj.github.io/argo-cd/operator-manual/declarative-setup/#atomic-configuration
+    app.kubernetes.io/part-of: argocd
+data:
+  application.instanceLabelKey: argocd.argoproj.io/instance
+  dex.config: ""
+  url: ''
+---
+# Source: argo-cd/templates/known-hosts-cm.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # Mandatory hardcoded name.
+  # Ref: https://argoproj.github.io/argo-cd/operator-manual/declarative-setup/#ssh-known-host-public-keys
+  name: argocd-ssh-known-hosts-cm
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    # Mandatory label
+    # Ref: https://argoproj.github.io/argo-cd/operator-manual/declarative-setup/#atomic-configuration
+    app.kubernetes.io/part-of: argocd
+data:
+  ssh_known_hosts: |
+    bitbucket.org ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAubiN81eDcafrgMeLzaFPsw2kNvEcqTKl/VqLat/MaB33pZy0y3rJZtnqwR2qOOvbwKZYKiEO1O6VqNEBxKvJJelCq0dTXWT5pbO2gDXC6h6QDXCaHo6pOHGPUy+YBaGQRGuSusMEASYiWunYN0vCAI8QaXnWMXNMdFP3jHAJH0eDsoiGnLPBlBp4TNm6rYI74nMzgz3B9IikW4WVK+dc8KZJZWYjAuORU3jc1c/NPskD2ASinf8v3xnfXeukU0sJ5N6m5E8VLjObPEO+mN2t/FZTMZLiFqPWc/ALSqnMnnhwrNi2rbfg/rd/IpL8Le3pSBne8+seeFVBoGqzHM9yXw==
+    github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
+    gitlab.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFSMqzJeV9rUzU4kWitGjeR4PWSa29SPqJ1fVkhtj3Hw9xjLVXVYrU9QlYWrOLXBpQ6KWjbjTDTdDkoohFzgbEY=
+    gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf
+    gitlab.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsj2bNKTBSpIYDEGk9KxsGh3mySTRgMtXL583qmBpzeQ+jqCMRgBqB98u3z++J1sKlXHWfM9dyhSevkMwSbhoR8XIq/U0tCNyokEi/ueaBMCvbcTHhO7FcwzY92WK4Yt0aGROY5qX2UKSeOvuP4D6TPqKF1onrSzH9bx9XUf2lEdWT/ia1NEKjunUqu1xOB/StKDHMoX4/OKyIzuS0q/T1zOATthvasJFoPrAjkohTyaDUz2LN5JoH839hViyEG82yB+MjcFV5MU3N1l1QL3cVUCh93xSaua1N85qivl+siMkPGbO5xR/En4iEY6K2XPASUEMaieWVNTRCtJ4S8H+9
+    ssh.dev.azure.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7Hr1oTWqNqOlzGJOfGJ4NakVyIzf1rXYd4d7wo6jBlkLvCA4odBlL0mDUyZ0/QUfTTqeu+tm22gOsv+VrVTMk6vwRU75gY/y9ut5Mb3bR5BV58dKXyq9A9UeB5Cakehn5Zgm6x1mKoVyf+FFn26iYqXJRgzIZZcZ5V6hrE0Qg39kZm4az48o0AUbf6Sp4SLdvnuMa2sVNwHBboS7EJkm57XQPVU3/QpyNLHbWDdzwtrlS+ez30S3AdYhLKEOxAG8weOnyrtLJAUen9mTkol8oII1edf7mWWbWVf0nBmly21+nZcmCTISQBtdcyPaEno7fFQMDD26/s0lfKob4Kw8H
+    vs-ssh.visualstudio.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7Hr1oTWqNqOlzGJOfGJ4NakVyIzf1rXYd4d7wo6jBlkLvCA4odBlL0mDUyZ0/QUfTTqeu+tm22gOsv+VrVTMk6vwRU75gY/y9ut5Mb3bR5BV58dKXyq9A9UeB5Cakehn5Zgm6x1mKoVyf+FFn26iYqXJRgzIZZcZ5V6hrE0Qg39kZm4az48o0AUbf6Sp4SLdvnuMa2sVNwHBboS7EJkm57XQPVU3/QpyNLHbWDdzwtrlS+ez30S3AdYhLKEOxAG8weOnyrtLJAUen9mTkol8oII1edf7mWWbWVf0nBmly21+nZcmCTISQBtdcyPaEno7fFQMDD26/s0lfKob4Kw8H
+---
+# Source: argo-cd/templates/application-controller/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-cd-app-controller
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - '*'
+    resources:
+      - '*'
+    verbs:
+      - '*'
+  - nonResourceURLs:
+      - '*'
+    verbs:
+      - '*'
+---
+# Source: argo-cd/templates/server/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-cd-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - '*'
+    resources:
+      - '*'
+    verbs:
+      - delete
+      - get
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+    verbs:
+      - get
+---
+# Source: argo-cd/templates/application-controller/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-cd-app-controller
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-cd-app-controller
+subjects:
+  - kind: ServiceAccount
+    name: argo-cd-argocd-app-controller
+    namespace: default
+---
+# Source: argo-cd/templates/server/clusterrolebinding.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: argo-cd-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-cd-server
+subjects:
+  - kind: ServiceAccount
+    name: argo-cd-argocd-server
+    namespace: default
+---
+# Source: argo-cd/templates/application-controller/role.yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: argo-cd-app-controller
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - applications
+      - appprojects
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - list
+---
+# Source: argo-cd/templates/repo-server/role.yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: argo-cd-repo-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - applications
+    verbs:
+      - get
+      - list
+      - watch
+---
+# Source: argo-cd/templates/server/role.yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: argo-cd-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - configmaps
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - applications
+      - appprojects
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - delete
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - list
+---
+# Source: argo-cd/templates/application-controller/rolebinding.yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: argo-cd-app-controller
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: argo-cd-argocd-app-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-cd-app-controller
+---
+# Source: argo-cd/templates/repo-server/rolebinding.yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: argo-cd-repo-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: argo-cd-argocd-repo-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-cd-repo-server
+---
+# Source: argo-cd/templates/server/rolebinding.yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: argo-cd-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: argo-cd-argocd-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-cd-server
+---
+# Source: argo-cd/charts/redis/templates/headless-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-cd-redis-headless
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: argo-cd
+---
+# Source: argo-cd/charts/redis/templates/master/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-cd-redis-master
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: master
+spec:
+  type: ClusterIP
+  
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+      nodePort: null
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/component: master
+---
+# Source: argo-cd/charts/redis/templates/replicas/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-cd-redis-replicas
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: replica
+spec:
+  type: ClusterIP
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+      nodePort: null
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/component: replica
+---
+# Source: argo-cd/templates/application-controller/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-cd-app-controller
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+spec:
+  type: ClusterIP
+  
+  ports:
+    - name: tcp-controller
+      port: 8082
+      targetPort: controller
+      protocol: TCP
+      nodePort: null
+  selector:
+    app.kubernetes.io/name: argo-cd
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/component: controller
+---
+# Source: argo-cd/templates/repo-server/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-cd-repo-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: repo-server
+  annotations:
+    projectcontour.io/upstream-protocol.h2c: https,443
+spec:
+  type: ClusterIP
+  
+  ports:
+    - name: tcp-repo-server
+      port: 8081
+      targetPort: repo-server
+      protocol: TCP
+      nodePort: null
+  selector:
+    app.kubernetes.io/name: argo-cd
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/component: repo-server
+---
+# Source: argo-cd/templates/server/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-cd-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+      nodePort: null
+    - name: https
+      port: 443
+      # NOTE: Argo CD uses only one port (8080) configured with https and always redirects http request to it, so the target port is the same than for http
+      targetPort: http
+      protocol: TCP
+      nodePort: null
+  selector:
+    app.kubernetes.io/name: argo-cd
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/component: server
+---
+# Source: argo-cd/templates/application-controller/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-cd-app-controller
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: controller
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argo-cd
+      app.kubernetes.io/instance: argo-cd
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argo-cd
+        helm.sh/chart: argo-cd-2.0.14
+        app.kubernetes.io/instance: argo-cd
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: controller
+    spec:
+      serviceAccountName: argo-cd-argocd-app-controller
+      
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: argo-cd
+                    app.kubernetes.io/instance: argo-cd
+                    app.kubernetes.io/component: controller
+                namespaces:
+                  - "default"
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      securityContext:
+        fsGroup: 1001
+      initContainers:
+        - name: wait-for-redis
+          image: docker.io/bitnami/redis:6.2.6-debian-10-r42
+          imagePullPolicy: "IfNotPresent"
+          command:
+            - /bin/bash
+          args:
+            - -ec
+            - |
+                #!/bin/bash
+
+                set -o errexit
+                set -o nounset
+                set -o pipefail
+
+                . /opt/bitnami/scripts/libos.sh
+                . /opt/bitnami/scripts/liblog.sh
+
+                check_redis_connection() {
+                  local result="$(redis-cli -h argo-cd-redis-master -p 6379 PING)"
+                  if [[ "$result" != "PONG" ]]; then
+                    false
+                  fi
+                }
+
+                info "Checking redis connection..."
+                if ! retry_while "check_redis_connection"; then
+                    error "Could not connect to the Redis server"
+                    return 1
+                else
+                    info "Connected to the Redis instance"
+                fi
+          env:
+            - name: REDISCLI_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+      containers:
+        - name: controller
+          image: docker.io/bitnami/argo-cd:2.1.7-debian-10-r0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 1001
+          command:
+            - argocd-application-controller
+          args:
+            - --status-processors
+            - "20"
+            - --operation-processors
+            - "10"
+            - --app-resync
+            - "180"
+            - --self-heal-timeout-seconds
+            - "5"
+            - --repo-server
+            - argo-cd-repo-server:8081
+            - --logformat
+            - text
+            - --loglevel
+            - info
+            # TODO(miguelaeh): Test the chart using redis sentinel enabled: https://github.com/argoproj/argo-cd/blob/2a410187565e15633b6f2a8c8d8da22cf02b257d/util/cache/cache.go#L40
+            - --redis
+            - argo-cd-redis-master:6379
+          ports:
+            - name: controller
+              containerPort: 8082
+              protocol: TCP
+            - name: metrics
+              containerPort: 8082
+              protocol: TCP
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+          envFrom:
+          resources:
+            limits: {}
+            requests: {}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            # Mounting into a path that will be read by Argo CD.
+            # This secret will be autogenerated by Argo CD repo server unless it already exists. Users can create its own certificate to override it.
+            # Ref: https://argoproj.github.io/argo-cd/operator-manual/tls/#inbound-tls-certificates-used-by-argocd-repo-sever
+            - mountPath: /app/config/server/tls
+              name: argocd-repo-server-tls
+      volumes:
+        - name: argocd-repo-server-tls
+          secret:
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+            optional: true
+            secretName: argocd-repo-server-tls
+---
+# Source: argo-cd/templates/repo-server/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-cd-repo-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: repo-server
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argo-cd
+      app.kubernetes.io/instance: argo-cd
+      app.kubernetes.io/component: repo-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argo-cd
+        helm.sh/chart: argo-cd-2.0.14
+        app.kubernetes.io/instance: argo-cd
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: repo-server
+    spec:
+      serviceAccountName: argo-cd-argocd-repo-server
+      
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: argo-cd
+                    app.kubernetes.io/instance: argo-cd
+                    app.kubernetes.io/component: repo-server
+                namespaces:
+                  - "default"
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      securityContext:
+        fsGroup: 1001
+      initContainers:
+        - name: wait-for-redis
+          image: docker.io/bitnami/redis:6.2.6-debian-10-r42
+          imagePullPolicy: "IfNotPresent"
+          command:
+            - /bin/bash
+          args:
+            - -ec
+            - |
+                #!/bin/bash
+
+                set -o errexit
+                set -o nounset
+                set -o pipefail
+
+                . /opt/bitnami/scripts/libos.sh
+                . /opt/bitnami/scripts/liblog.sh
+
+                check_redis_connection() {
+                  local result="$(redis-cli -h argo-cd-redis-master -p 6379 PING)"
+                  if [[ "$result" != "PONG" ]]; then
+                    false
+                  fi
+                }
+
+                info "Checking redis connection..."
+                if ! retry_while "check_redis_connection"; then
+                    error "Could not connect to the Redis server"
+                    return 1
+                else
+                    info "Connected to the Redis instance"
+                fi
+          env:
+            - name: REDISCLI_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+      containers:
+        - name: argocd-repo-server
+          image: docker.io/bitnami/argo-cd:2.1.7-debian-10-r0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 1001
+          command:
+            - argocd-repo-server
+          args:
+            - --logformat
+            - text
+            - --loglevel
+            - info
+            - --redis
+            - argo-cd-redis-master:6379
+          ports:
+            - name: repo-server
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+          envFrom:
+          resources:
+            limits: {}
+            requests: {}
+          livenessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            # Mounting into a path that will be read by Argo CD
+            # Ref: https://argoproj.github.io/argo-cd/operator-manual/declarative-setup/#ssh-known-host-public-keys
+            - name: ssh-known-hosts
+              mountPath: /app/config/ssh
+            # Mounting into a path that will be read by Argo CD.
+            # This secret will be autogenerated by Argo CD repo server unless it already exists. Users can create its own certificate to override it.
+            # Ref: https://argoproj.github.io/argo-cd/operator-manual/tls/#inbound-tls-certificates-used-by-argocd-repo-sever
+            - mountPath: /app/config/server/tls
+              name: argocd-repo-server-tls
+            - mountPath: /app/config/gpg/keys
+              name: gpg-keyring
+            - mountPath: /tmp
+              name: tmp-dir
+      volumes:
+        - name: ssh-known-hosts
+          configMap:
+            name: argocd-ssh-known-hosts-cm
+        - name: argocd-repo-server-tls
+          secret:
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+            optional: true
+            secretName: argocd-repo-server-tls
+        - emptyDir: {}
+          name: tmp-dir
+        - emptyDir: {}
+          name: gpg-keyring
+---
+# Source: argo-cd/templates/server/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-cd-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: server
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argo-cd
+      app.kubernetes.io/instance: argo-cd
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argo-cd
+        helm.sh/chart: argo-cd-2.0.14
+        app.kubernetes.io/instance: argo-cd
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: server
+    spec:
+      serviceAccountName: argo-cd-argocd-server
+      
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: argo-cd
+                    app.kubernetes.io/instance: argo-cd
+                    app.kubernetes.io/component: server
+                namespaces:
+                  - "default"
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      securityContext:
+        fsGroup: 1001
+      initContainers:
+        - name: wait-for-redis
+          image: docker.io/bitnami/redis:6.2.6-debian-10-r42
+          imagePullPolicy: "IfNotPresent"
+          command:
+            - /bin/bash
+          args:
+            - -ec
+            - |
+                #!/bin/bash
+
+                set -o errexit
+                set -o nounset
+                set -o pipefail
+
+                . /opt/bitnami/scripts/libos.sh
+                . /opt/bitnami/scripts/liblog.sh
+
+                check_redis_connection() {
+                  local result="$(redis-cli -h argo-cd-redis-master -p 6379 PING)"
+                  if [[ "$result" != "PONG" ]]; then
+                    false
+                  fi
+                }
+
+                info "Checking redis connection..."
+                if ! retry_while "check_redis_connection"; then
+                    error "Could not connect to the Redis server"
+                    return 1
+                else
+                    info "Connected to the Redis instance"
+                fi
+          env:
+            - name: REDISCLI_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+      containers:
+        - name: argocd-server
+          image: docker.io/bitnami/argo-cd:2.1.7-debian-10-r0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 1001
+          command:
+            - argocd-server
+          args:
+            - --staticassets
+            - /opt/bitnami/argo-cd/app
+            - --repo-server
+            - argo-cd-repo-server:8081
+            - --logformat
+            - text
+            - --loglevel
+            - info
+            # TODO(miguelaeh): Test the chart using redis sentinel enabled: https://github.com/argoproj/argo-cd/blob/2a410187565e15633b6f2a8c8d8da22cf02b257d/util/cache/cache.go#L40
+            - --redis
+            - argo-cd-redis-master:6379
+            - --insecure
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+          envFrom:
+          resources:
+            limits: {}
+            requests: {}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            # Mounting into a path that will be read by Argo CD
+            # Ref: https://argoproj.github.io/argo-cd/operator-manual/declarative-setup/#ssh-known-host-public-keys
+            - name: ssh-known-hosts
+              mountPath: /app/config/ssh
+            # Mounting into a path that will be read by Argo CD.
+            # This secret will be autogenerated by Argo CD repo server unless it already exists. Users can create its own certificate to override it.
+            # Ref: https://argoproj.github.io/argo-cd/operator-manual/tls/#inbound-tls-certificates-used-by-argocd-repo-sever
+            - mountPath: /app/config/server/tls
+              name: argocd-repo-server-tls
+      volumes:
+        - name: ssh-known-hosts
+          configMap:
+            name: argocd-ssh-known-hosts-cm
+        - name: argocd-repo-server-tls
+          secret:
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: ca.crt
+                path: ca.crt
+            optional: true
+            secretName: argocd-repo-server-tls
+---
+# Source: argo-cd/charts/redis/templates/master/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: argo-cd-redis-master
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/instance: argo-cd
+      app.kubernetes.io/component: master
+  serviceName: argo-cd-redis-headless
+  updateStrategy:
+    rollingUpdate: {}
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+        helm.sh/chart: redis-15.5.5
+        app.kubernetes.io/instance: argo-cd
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: master
+      annotations:
+        checksum/configmap: 0c7cb1aa6d1b9c87fd9514524194a4a7d59040cd42494eca98e9ea6d3c7ae7ab
+        checksum/health: 3ff3b4f0dd4ba7b0b9f0e76a6cfebb64770ceb33f0fe7ef033d5177dcae7a2bb
+        checksum/scripts: 07092750336a912bef255edb3c05368bcb77f1ee77360cedbd9ba16a2d59e94e
+        checksum/secret: 0920fe3bc0d02452324b47603c62983cae19da8fb3f689585949fcbfa5d64a9d
+    spec:
+      
+      securityContext:
+        fsGroup: 1001
+      serviceAccountName: argo-cd-redis
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: redis
+                    app.kubernetes.io/instance: argo-cd
+                    app.kubernetes.io/component: master
+                namespaces:
+                  - "default"
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redis
+          image: docker.io/bitnami/redis:6.2.6-debian-10-r42
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            runAsUser: 1001
+          command:
+            - /bin/bash
+          args:
+            - -c
+            - /opt/bitnami/scripts/start-scripts/start-master.sh
+          env:
+            - name: BITNAMI_DEBUG
+              value: "false"
+            - name: REDIS_REPLICATION_MODE
+              value: master
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "no"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+            - name: REDIS_TLS_ENABLED
+              value: "no"
+            - name: REDIS_PORT
+              value: "6379"
+          ports:
+            - name: redis
+              containerPort: 6379
+          livenessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            # One second longer than command timeout should prevent generation of zombie processes.
+            timeoutSeconds: 6
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /health/ping_liveness_local.sh 5
+          readinessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /health/ping_readiness_local.sh 1
+          resources:
+            limits: {}
+            requests: {}
+          volumeMounts:
+            - name: start-scripts
+              mountPath: /opt/bitnami/scripts/start-scripts
+            - name: health
+              mountPath: /health
+            - name: redis-data
+              mountPath: /data
+              subPath: 
+            - name: config
+              mountPath: /opt/bitnami/redis/mounted-etc
+            - name: redis-tmp-conf
+              mountPath: /opt/bitnami/redis/etc/
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: start-scripts
+          configMap:
+            name: argo-cd-redis-scripts
+            defaultMode: 0755
+        - name: health
+          configMap:
+            name: argo-cd-redis-health
+            defaultMode: 0755
+        - name: config
+          configMap:
+            name: argo-cd-redis-configuration
+        - name: redis-tmp-conf
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+        labels:
+          app.kubernetes.io/name: redis
+          app.kubernetes.io/instance: argo-cd
+          app.kubernetes.io/component: master
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "8Gi"
+---
+# Source: argo-cd/charts/redis/templates/replicas/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: argo-cd-redis-replicas
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: redis
+    helm.sh/chart: redis-15.5.5
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: replica
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/instance: argo-cd
+      app.kubernetes.io/component: replica
+  serviceName: argo-cd-redis-headless
+  updateStrategy:
+    rollingUpdate: {}
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+        helm.sh/chart: redis-15.5.5
+        app.kubernetes.io/instance: argo-cd
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: replica
+      annotations:
+        checksum/configmap: 0c7cb1aa6d1b9c87fd9514524194a4a7d59040cd42494eca98e9ea6d3c7ae7ab
+        checksum/health: 3ff3b4f0dd4ba7b0b9f0e76a6cfebb64770ceb33f0fe7ef033d5177dcae7a2bb
+        checksum/scripts: 07092750336a912bef255edb3c05368bcb77f1ee77360cedbd9ba16a2d59e94e
+        checksum/secret: 0920fe3bc0d02452324b47603c62983cae19da8fb3f689585949fcbfa5d64a9d
+    spec:
+      
+      securityContext:
+        fsGroup: 1001
+      serviceAccountName: argo-cd-redis
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: redis
+                    app.kubernetes.io/instance: argo-cd
+                    app.kubernetes.io/component: replica
+                namespaces:
+                  - "default"
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redis
+          image: docker.io/bitnami/redis:6.2.6-debian-10-r42
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            runAsUser: 1001
+          command:
+            - /bin/bash
+          args:
+            - -c
+            - /opt/bitnami/scripts/start-scripts/start-replica.sh
+          env:
+            - name: BITNAMI_DEBUG
+              value: "false"
+            - name: REDIS_REPLICATION_MODE
+              value: slave
+            - name: REDIS_MASTER_HOST
+              value: argo-cd-redis-master-0.argo-cd-redis-headless.default.svc.cluster.local
+            - name: REDIS_MASTER_PORT_NUMBER
+              value: "6379"
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "no"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+            - name: REDIS_MASTER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: argo-cd-redis
+                  key: redis-password
+            - name: REDIS_TLS_ENABLED
+              value: "no"
+            - name: REDIS_PORT
+              value: "6379"
+          ports:
+            - name: redis
+              containerPort: 6379
+          livenessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 6
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /health/ping_liveness_local_and_master.sh 5
+          readinessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /health/ping_readiness_local_and_master.sh 1
+          resources:
+            limits: {}
+            requests: {}
+          volumeMounts:
+            - name: start-scripts
+              mountPath: /opt/bitnami/scripts/start-scripts
+            - name: health
+              mountPath: /health
+            - name: redis-data
+              mountPath: /data
+              subPath: 
+            - name: config
+              mountPath: /opt/bitnami/redis/mounted-etc
+            - name: redis-tmp-conf
+              mountPath: /opt/bitnami/redis/etc
+      volumes:
+        - name: start-scripts
+          configMap:
+            name: argo-cd-redis-scripts
+            defaultMode: 0755
+        - name: health
+          configMap:
+            name: argo-cd-redis-health
+            defaultMode: 0755
+        - name: config
+          configMap:
+            name: argo-cd-redis-configuration
+        - name: redis-tmp-conf
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+        labels:
+          app.kubernetes.io/name: redis
+          app.kubernetes.io/instance: argo-cd
+          app.kubernetes.io/component: replica
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "8Gi"
+---
+# Source: argo-cd/templates/server/ingress-grcp.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argo-cd-server-grpc
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: server
+spec:
+  rules:
+    - host: argocd.server.local
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: argo-cd-server
+                port:
+                  name: https
+  tls:
+    - hosts:
+        - argocd.server.local
+      secretName: argocd.server.local-tls
+---
+# Source: argo-cd/templates/server/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argo-cd-server
+  namespace: "default"
+  labels:
+    app.kubernetes.io/name: argo-cd
+    helm.sh/chart: argo-cd-2.0.14
+    app.kubernetes.io/instance: argo-cd
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: server
+spec:
+  rules:
+    - host: argocd.server.local
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: argo-cd-server
+                port:
+                  name: https
+  tls:
+    - hosts:
+        - argocd.server.local
+      secretName: argocd.server.local-tls

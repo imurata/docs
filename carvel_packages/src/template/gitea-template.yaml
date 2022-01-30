@@ -1,0 +1,29 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:yaml", "yaml")
+---
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: Package
+metadata:
+  name: #@ "gitea.tkg.tanzu." + data.values.version
+spec:
+  refName: gitea.tkg.tanzu
+  version: #@ data.values.version
+  releaseNotes: |
+        Initial release of Gitea for Air-gapped env
+  valuesSchema:
+    openAPIv3: #@ yaml.decode(data.values.openapi)["components"]["schemas"]["dataValues"]
+  template:
+    spec:
+      fetch:
+      - imgpkgBundle:
+          image: oss-harbor.tkg.tanzu/my-project/gitea/bundle@sha256:adc2405b3ec6511d56446ab71ae707bc1e4cd526e1ec6752fdf84084ca10a484
+      template:
+      - ytt:
+          paths:
+          - "./config"
+      - kbld:
+          paths:
+          - "-"
+          - ".imgpkg/images.yml"
+      deploy:
+      - kapp: {}

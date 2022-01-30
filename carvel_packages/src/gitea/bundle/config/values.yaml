@@ -1,0 +1,8 @@
+#@data/values-schema
+---
+#@schema/desc "Namespace"
+namespace: gitea
+#@schema/desc "Default Password"
+gitea_password: "VMware1!"
+#@schema/desc "Hostname"
+gitea_host: example.com

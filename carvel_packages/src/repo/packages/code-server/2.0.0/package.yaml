@@ -1,0 +1,41 @@
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: Package
+metadata:
+  name: code-server.tkg.tanzu.2.0.0
+spec:
+  refName: code-server.tkg.tanzu
+  version: 2.0.0
+  releaseNotes: |
+    Initial release of code-server for Air-gapped env
+  valuesSchema:
+    openAPIv3:
+      type: object
+      additionalProperties: false
+      properties:
+        namespace:
+          type: string
+          default: code-server
+          description: Namespace
+        code_server_password:
+          type: string
+          default: VMware1!
+          description: Default Password
+        code_server_host:
+          type: string
+          default: example.com
+          description: Hostname
+  template:
+    spec:
+      fetch:
+      - imgpkgBundle:
+          image: oss-harbor.tkg.tanzu/my-project/code-server/bundle@sha256:c4317874eecade3b1ae7f725861b1afb38da6aab896c22e080ab5b3a0af6f73a
+      template:
+      - ytt:
+          paths:
+          - ./config
+      - kbld:
+          paths:
+          - '-'
+          - .imgpkg/images.yml
+      deploy:
+      - kapp: {}

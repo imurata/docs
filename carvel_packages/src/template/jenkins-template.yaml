@@ -1,0 +1,29 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:yaml", "yaml")
+---
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: Package
+metadata:
+  name: #@ "jenkins.tkg.tanzu." + data.values.version
+spec:
+  refName: jenkins.tkg.tanzu
+  version: #@ data.values.version
+  releaseNotes: |
+        Initial release of Jenkins for Air-gapped env
+  valuesSchema:
+    openAPIv3: #@ yaml.decode(data.values.openapi)["components"]["schemas"]["dataValues"]
+  template:
+    spec:
+      fetch:
+      - imgpkgBundle:
+          image: oss-harbor.tkg.tanzu/my-project/jenkins/bundle@sha256:f27ac987462f89df00bdddf835fc763178e4bb0249c0c2b45e723ec03b9f8bbd
+      template:
+      - ytt:
+          paths:
+          - "./config"
+      - kbld:
+          paths:
+          - "-"
+          - ".imgpkg/images.yml"
+      deploy:
+      - kapp: {}

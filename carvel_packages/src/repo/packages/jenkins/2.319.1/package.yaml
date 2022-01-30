@@ -1,0 +1,41 @@
+apiVersion: data.packaging.carvel.dev/v1alpha1
+kind: Package
+metadata:
+  name: jenkins.tkg.tanzu.2.319.1
+spec:
+  refName: jenkins.tkg.tanzu
+  version: 2.319.1
+  releaseNotes: |
+    Initial release of Jenkins for Air-gapped env
+  valuesSchema:
+    openAPIv3:
+      type: object
+      additionalProperties: false
+      properties:
+        namespace:
+          type: string
+          default: jenkins
+          description: Namespace
+        jenkins_password:
+          type: string
+          default: VMware1!
+          description: Default Password
+        jenkins_host:
+          type: string
+          default: example.com
+          description: Hostname
+  template:
+    spec:
+      fetch:
+      - imgpkgBundle:
+          image: oss-harbor.tkg.tanzu/my-project/jenkins/bundle@sha256:f27ac987462f89df00bdddf835fc763178e4bb0249c0c2b45e723ec03b9f8bbd
+      template:
+      - ytt:
+          paths:
+          - ./config
+      - kbld:
+          paths:
+          - '-'
+          - .imgpkg/images.yml
+      deploy:
+      - kapp: {}

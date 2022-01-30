@@ -1,0 +1,32 @@
+#@ load("@ytt:overlay", "overlay")
+#@ load("@ytt:data", "data")
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: code-server-selfsigned-issuer
+  namespace: #@ data.values.namespace
+spec:
+  selfSigned: { }
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: code-server-ca
+  namespace: #@ data.values.namespace
+spec:
+  commonName: code-server-ca
+  isCA: true
+  issuerRef:
+    kind: Issuer
+    name: code-server-selfsigned-issuer
+  secretName: code-server-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: code-server-ca-issuer
+  namespace: #@ data.values.namespace
+spec:
+  ca:
+    secretName: code-server-ca
