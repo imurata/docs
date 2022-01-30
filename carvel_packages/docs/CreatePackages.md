@@ -532,7 +532,7 @@ $ tanzu package available list code-server.tkg.tanzu
 ※repositoryの追加もtanzuコマンドから可能だが、secretの指定が出来ないため、今回は割愛。
 
 kubeappsからも確認可能。
-![picture 6](../../images/CreatePackages/1643349781204.png)  
+![picture 6](../images/CreatePackages/1643349781204.png)  
 
 # Jenkinsのパッケージ化
 基本的にはcode-serverと同じなので、差がある点を中心に記載する。
