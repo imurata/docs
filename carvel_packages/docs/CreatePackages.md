@@ -3,6 +3,10 @@
 ここではcode-server, Jenkins、ArgoCD、GiteaをPackage化していく。\
 通しでやれば分かるが、自動化出来るポイントは多い。
 ただしここでは手順確認を主たる目的としているので、自動化しない手順で記載している。
+
+利用しているコードは以下に置いている。\
+https://github.com/imurata/docs/tree/main/carvel_packages/src
+
 - [基本的な流れ](#基本的な流れ)
   - [オンライン環境](#オンライン環境)
   - [オフライン環境](#オフライン環境)
