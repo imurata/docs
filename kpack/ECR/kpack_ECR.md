@@ -2,7 +2,7 @@
 - kp image saveをECRに対して行う
 - ECR以外のリポジトリの利用はStack, Storeのみ許可
 
-## ECR参照用のSecret作成
+## ECR参照用のkp secretの作成
 
 ECRの認証情報は12時間でexpireするので、定期的に更新する。
 ここではcronjobで更新する。\
@@ -51,7 +51,7 @@ EOF
 ```
 
 CronjobとAWSのログイン情報が入ったConfigMapは以下となる。
-
+Cronjob内でkpコマンドを取得し、6時間に一回kp secretを更新する。
 ```
 cat <<EOF | kubectl apply -f -
 apiVersion: batch/v1
