@@ -145,7 +145,7 @@ EOF
 ```
 
 ## builderからECRを使う
-空のリポジトリを用意。
+空のリポジトリを用意。\
 ![picture 8](../images/1646124493878.png)  
 
 ECRの認証情報が入ったSecretを参照するSAを作成。
@@ -221,7 +221,7 @@ spec:
     - id: paketo-buildpacks/python
 EOF
 ```
-applyしたタイミングで以下のように生成されればOK。
+applyしたタイミングで以下のように生成されればOK。\
 ![picture 9](../images/1646125188094.png)  
 
 イメージを生成する。
@@ -243,7 +243,25 @@ Adding cache layer 'cache.sbom'
 ===> COMPLETION
 Build successful
 ```
-ECR側にも作成されていることが分かる。
+ECR側にも作成されていることが分かる。\
 ![picture 10](../images/1646126817762.png)  
+
+Cronjobの動作も確認する。
+```
+$ k logs ecr-cred-helper-27435480-mjq4p | tail
++ mv kp-linux-0.4.2 kp
++ chmod +x kp
++ ./kp secret delete generated-ecr-token -n cicd
+Secret "generated-ecr-token" deleted
++ ./kp secret create generated-ecr-token --registry 375783000519.dkr.ecr.us-east-1.amazonaws.com --registry-user AWS -n cicd
+Secret "generated-ecr-token" created
++ kubectl patch serviceaccount ecr-auth-reader -p '{"imagePullSecrets":[{"name":"generated-ecr-token"}]}' -n cicd
+serviceaccount/ecr-auth-reader patched (no change)
+All done.
++ echo 'All done.'
+```
+再作成には失敗してなさそう。
+
+お疲れ様でした。
 
 お疲れ様でした。
